@@ -133,5 +133,10 @@ output "minikube_ip" {
 }
 
 output "kubernetes_token" {
-  value = file("/usr/local/bin/kube_token.txt")
+  value = chomp(data.external.kubernetes_token.result["token"])
+}
+
+data "external" "kubernetes_token" {
+  program = ["bash", "-c", "cat /usr/local/bin/kube_token.txt"]
+  depends_on = [null_resource.create_kubernetes_resources]
 }
