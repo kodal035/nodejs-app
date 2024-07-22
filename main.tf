@@ -71,6 +71,7 @@ resource "null_resource" "install_jenkins" {
 resource "null_resource" "setup_kubernetes_config" {
   provisioner "local-exec" {
     command = <<EOF
+      while ! minikube status | grep -q 'host: Running'; do sleep 5; done
       mkdir -p /var/lib/jenkins/.kube
       cp ~/.kube/config /var/lib/jenkins/.kube/config
       sudo chown jenkins:jenkins /var/lib/jenkins/.kube/config
@@ -83,6 +84,7 @@ resource "null_resource" "setup_kubernetes_config" {
 resource "null_resource" "update_kube_config" {
   provisioner "local-exec" {
     command = <<EOF
+      while ! minikube status | grep -q 'host: Running'; do sleep 5; done
       sudo su -c "
       curl -L -o /usr/local/bin/update_kube_config.sh https://github.com/kodal035/nodejs-app/raw/main/scripts/update_kube_config.sh
       chmod +x /usr/local/bin/update_kube_config.sh
@@ -92,10 +94,11 @@ resource "null_resource" "update_kube_config" {
   }
 }
 
-# Kubernetes Kaynaklarını Oluştur ve Token Al
+# Kubernetes Kaynaklarını Oluştur
 resource "null_resource" "create_kubernetes_resources" {
   provisioner "local-exec" {
     command = <<EOF
+      while ! minikube status | grep -q 'host: Running'; do sleep 5; done
       kubectl create ns jenkins
       kubectl create sa jenkins -n jenkins
       kubectl create rolebinding jenkins-admin-binding --clusterrole=admin --serviceaccount=jenkins:jenkins --namespace=jenkins
@@ -104,15 +107,13 @@ resource "null_resource" "create_kubernetes_resources" {
       sudo su -c '/usr/local/bin/get_kube_token.sh'
     EOF
   }
-  triggers = {
-    always_run = "${timestamp()}"
-  }
 }
 
 # Jenkins Pipeline'ı Oluştur
 resource "null_resource" "create_pipeline" {
   provisioner "local-exec" {
     command = <<EOF
+      while ! minikube status | grep -q 'host: Running'; do sleep 5; done
       curl -L -o pipeline_config.xml https://github.com/kodal035/nodejs-app/raw/main/pipeline_config.xml
       if ! command -v jenkins-cli > /dev/null; then
         wget http://localhost:8080/jnlpJars/jenkins-cli.jar
@@ -132,10 +133,5 @@ output "minikube_ip" {
 }
 
 output "kubernetes_token" {
-  value = chomp(data.external.kubernetes_token.result["token"])
-}
-
-data "external" "kubernetes_token" {
-  program = ["bash", "-c", "cat /usr/local/bin/kube_token.txt"]
-  depends_on = [null_resource.create_kubernetes_resources]
+  value = file("/usr/local/bin/kube_token.txt")
 }
