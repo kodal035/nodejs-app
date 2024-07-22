@@ -36,13 +36,12 @@ resource "null_resource" "install_docker" {
       echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
       sudo apt-get update
       sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-      sudo groupadd docker
+      sudo groupadd docker || true
       sudo usermod -aG docker $USER
       newgrp docker
       sudo systemctl enable docker.service
       sudo systemctl enable containerd.service
     EOF
-    depends_on = [null_resource.fetch_scripts]
   }
 }
 
@@ -54,7 +53,6 @@ resource "null_resource" "install_minikube" {
       sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
       minikube start --driver=docker
     EOF
-    depends_on = [null_resource.install_docker]
   }
 }
 
@@ -81,7 +79,6 @@ resource "null_resource" "install_jenkins" {
       sudo systemctl enable jenkins
       sudo systemctl start jenkins
     EOF
-    depends_on = [null_resource.install_minikube]
   }
 }
 
@@ -94,7 +91,6 @@ resource "null_resource" "setup_kubernetes_config" {
       sudo chown jenkins:jenkins /var/lib/jenkins/.kube/config
       sudo chmod 600 /var/lib/jenkins/.kube/config
     EOF
-    depends_on = [null_resource.install_jenkins]
   }
 }
 
@@ -116,7 +112,6 @@ resource "null_resource" "update_kube_config" {
       sed -i "s/\"client-certificate\": \".*\"/\"client-certificate-data\": \"${CLIENT_CERT_DATA}\"/" /var/lib/jenkins/.kube/config
       sed -i "s/\"client-key\": \".*\"/\"client-key-data\": \"${CLIENT_KEY_DATA}\"/" /var/lib/jenkins/.kube/config
     EOF
-    depends_on = [null_resource.setup_kubernetes_config]
   }
 }
 
@@ -129,7 +124,6 @@ resource "null_resource" "create_kubernetes_resources" {
       kubectl create token jenkins -n jenkins --duration=8760h
       kubectl create rolebinding jenkins-admin-binding --clusterrole=admin --serviceaccount=jenkins:jenkins --namespace=jenkins
     EOF
-    depends_on = [null_resource.update_kube_config]
   }
 }
 
@@ -147,7 +141,6 @@ resource "null_resource" "create_pipeline" {
 
       java -jar jenkins-cli.jar -s http://localhost:8080 create-job nodejs-app < pipeline_config.xml
     EOF
-    depends_on = [null_resource.create_kubernetes_resources]
   }
 }
 
@@ -158,6 +151,10 @@ output "jenkins_url" {
 
 output "minikube_ip" {
   value = "minikube ip"
+}
+
+data "external" "kubernetes_token" {
+  program = ["bash", "${path.module}/scripts/get_kube_token.sh"]
 }
 
 output "kubernetes_token" {
