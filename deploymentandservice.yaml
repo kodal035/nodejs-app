@@ -1,33 +1,31 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: my-nodejs-app
+  name: nodejs-app
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: my-nodejs-app
+      app: nodejs-app
   template:
     metadata:
       labels:
-        app: my-nodejs-app
+        app: nodejs-app
     spec:
       containers:
-      - name: nodejs-container
-        image: kodal035/nodejs-app  # DockerHub'daki imajınızın adı
+      - name: nodejs-app
+        image: kodal035/nodejs-app
         ports:
         - containerPort: 3000
-
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: my-nodejs-service
+  name: nodejs-app-service
 spec:
   selector:
-    app: my-nodejs-app
+    app: nodejs-app
   ports:
     - protocol: TCP
       port: 80
       targetPort: 3000
-  type: LoadBalancer
