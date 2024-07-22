@@ -1,6 +1,13 @@
-provider "null" {
-  version = "~> 2.1"
+terraform {
+  required_providers {
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 2.1"
+    }
+  }
 }
+
+provider "null" {}
 
 # Docker Kurulumu
 resource "null_resource" "install_docker" {
@@ -33,9 +40,7 @@ resource "null_resource" "install_minikube" {
       curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
       sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
       minikube start --driver=docker
-      minikube ip > minikube_ip.txt
     EOF
-    depends_on = [null_resource.install_docker]
   }
 }
 
@@ -62,7 +67,6 @@ resource "null_resource" "install_jenkins" {
       sudo systemctl enable jenkins
       sudo systemctl start jenkins
     EOF
-    depends_on = [null_resource.install_minikube]
   }
 }
 
@@ -75,7 +79,6 @@ resource "null_resource" "setup_kubernetes_config" {
       sudo chown jenkins:jenkins /var/lib/jenkins/.kube/config
       sudo chmod 600 /var/lib/jenkins/.kube/config
     EOF
-    depends_on = [null_resource.install_minikube]
   }
 }
 
@@ -83,15 +86,14 @@ resource "null_resource" "setup_kubernetes_config" {
 resource "null_resource" "update_kube_config" {
   provisioner "local-exec" {
     command = <<EOF
-      CA_DATA=$(cat /home/ubuntu/.kube/config | grep 'certificate-authority-data:' | awk '{print $2}')
-      CLIENT_CERT_DATA=$(cat /home/ubuntu/.minikube/profiles/minikube/client.crt | base64 -w 0)
-      CLIENT_KEY_DATA=$(cat /home/ubuntu/.minikube/profiles/minikube/client.key | base64 -w 0)
+      CA_DATA=$(cat ~/.kube/config | grep 'certificate-authority-data:' | awk '{print $2}')
+      CLIENT_CERT_DATA=$(cat ~/.minikube/profiles/minikube/client.crt | base64 -w 0)
+      CLIENT_KEY_DATA=$(cat ~/.minikube/profiles/minikube/client.key | base64 -w 0)
       
       sed -i "s/\"certificate-authority\": \".*\"/\"certificate-authority-data\": \"${CA_DATA}\"/" /var/lib/jenkins/.kube/config
       sed -i "s/\"client-certificate\": \".*\"/\"client-certificate-data\": \"${CLIENT_CERT_DATA}\"/" /var/lib/jenkins/.kube/config
       sed -i "s/\"client-key\": \".*\"/\"client-key-data\": \"${CLIENT_KEY_DATA}\"/" /var/lib/jenkins/.kube/config
     EOF
-    depends_on = [null_resource.setup_kubernetes_config]
   }
 }
 
@@ -104,7 +106,6 @@ resource "null_resource" "create_kubernetes_resources" {
       kubectl create token jenkins -n jenkins --duration=8760h
       kubectl create rolebinding jenkins-admin-binding --clusterrole=admin --serviceaccount=jenkins:jenkins --namespace=jenkins
     EOF
-    depends_on = [null_resource.update_kube_config]
   }
 }
 
@@ -122,7 +123,6 @@ resource "null_resource" "create_pipeline" {
 
       java -jar jenkins-cli.jar -s http://localhost:8080 create-job nodejs-app < pipeline_config.xml
     EOF
-    depends_on = [null_resource.install_jenkins, null_resource.create_kubernetes_resources]
   }
 }
 
@@ -132,13 +132,9 @@ output "jenkins_url" {
 }
 
 output "minikube_ip" {
-  value = trimspace(file("minikube_ip.txt"))
-  depends_on = [null_resource.install_minikube]
+  value = "minikube ip"
 }
 
 output "kubernetes_token" {
-  value = trimspace(
-    local_file.kube_token.content
-  )
-  depends_on = [null_resource.create_kubernetes_resources]
+  value = "${chomp(data.external.kubernetes_token.result)}"
 }
