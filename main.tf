@@ -36,7 +36,7 @@ resource "null_resource" "install_docker" {
       echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
       sudo apt-get update
       sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-      sudo groupadd docker || true
+      sudo groupadd docker
       sudo usermod -aG docker $USER
       newgrp docker
       sudo systemctl enable docker.service
@@ -108,9 +108,9 @@ resource "null_resource" "update_kube_config" {
       CLIENT_CERT_DATA=$(cat ~/.minikube/profiles/minikube/client.crt | base64 -w 0)
       CLIENT_KEY_DATA=$(cat ~/.minikube/profiles/minikube/client.key | base64 -w 0)
       
-      sed -i "s/\"certificate-authority\": \".*\"/\"certificate-authority-data\": \"${CA_DATA}\"/" /var/lib/jenkins/.kube/config
-      sed -i "s/\"client-certificate\": \".*\"/\"client-certificate-data\": \"${CLIENT_CERT_DATA}\"/" /var/lib/jenkins/.kube/config
-      sed -i "s/\"client-key\": \".*\"/\"client-key-data\": \"${CLIENT_KEY_DATA}\"/" /var/lib/jenkins/.kube/config
+      sudo su -c "sed -i 's/\"certificate-authority\": \".*\"/\"certificate-authority-data\": \"${CA_DATA}\"/' /var/lib/jenkins/.kube/config"
+      sudo su -c "sed -i 's/\"client-certificate\": \".*\"/\"client-certificate-data\": \"${CLIENT_CERT_DATA}\"/' /var/lib/jenkins/.kube/config"
+      sudo su -c "sed -i 's/\"client-key\": \".*\"/\"client-key-data\": \"${CLIENT_KEY_DATA}\"/' /var/lib/jenkins/.kube/config"
     EOF
   }
 }
@@ -151,10 +151,6 @@ output "jenkins_url" {
 
 output "minikube_ip" {
   value = "minikube ip"
-}
-
-data "external" "kubernetes_token" {
-  program = ["bash", "${path.module}/scripts/get_kube_token.sh"]
 }
 
 output "kubernetes_token" {
