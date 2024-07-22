@@ -92,7 +92,7 @@ resource "null_resource" "update_kube_config" {
   }
 }
 
-# Kubernetes Kaynaklarını Oluştur
+# Kubernetes Kaynaklarını Oluştur ve Token Al
 resource "null_resource" "create_kubernetes_resources" {
   provisioner "local-exec" {
     command = <<EOF
@@ -103,6 +103,9 @@ resource "null_resource" "create_kubernetes_resources" {
       chmod +x /usr/local/bin/get_kube_token.sh
       sudo su -c '/usr/local/bin/get_kube_token.sh'
     EOF
+  }
+  triggers = {
+    always_run = "${timestamp()}"
   }
 }
 
@@ -129,5 +132,10 @@ output "minikube_ip" {
 }
 
 output "kubernetes_token" {
-  value = file("/usr/local/bin/kube_token.txt")
+  value = chomp(data.external.kubernetes_token.result["token"])
+}
+
+data "external" "kubernetes_token" {
+  program = ["bash", "-c", "cat /usr/local/bin/kube_token.txt"]
+  depends_on = [null_resource.create_kubernetes_resources]
 }
