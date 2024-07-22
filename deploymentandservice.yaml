@@ -14,12 +14,9 @@ spec:
     spec:
       containers:
       - name: nodejs-container
-        image: kodal035/nodejs-practice:latest  # DockerHub'daki imajınızın adı
+        image: kodal035/nodejs-app  # DockerHub'daki imajınızın adı
         ports:
         - containerPort: 3000
-        env:
-        - name: NODE_ENV
-          value: "production"
 
 ---
 apiVersion: v1
