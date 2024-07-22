@@ -144,6 +144,11 @@ resource "null_resource" "create_pipeline" {
   }
 }
 
+# Kubernetes Token'ını Almak İçin External Kaynağı
+data "external" "kubernetes_token" {
+  program = ["bash", "${path.module}/scripts/get_kube_token.sh"]
+}
+
 # Çıktılar
 output "jenkins_url" {
   value = "http://localhost:8080"
